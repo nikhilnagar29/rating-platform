@@ -1,20 +1,13 @@
-# Use an official Node.js runtime as the base image
-FROM node:18
-
-# Set the working directory inside the container
+FROM node:20
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
 COPY backend/package*.json ./
-
-# Install dependencies
 RUN npm install
 
-# Copy the rest of the backend code
 COPY backend/ .
 
-# Expose the port the app runs on
-EXPOSE 5000
+# Install wait-for-it
+RUN apt-get update && apt-get install -y netcat-openbsd
 
-# Command to run the application
-CMD ["npm", "start"]
+EXPOSE 5001
+CMD ["sh", "-c", "until nc -z db 5432; do echo 'Waiting for Postgres...'; sleep 2; done; node server.js"]
