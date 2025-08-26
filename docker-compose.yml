@@ -31,6 +31,9 @@ services:
       PORT: 5001
     ports:
       - "5001:5001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     depends_on:
       - db
     networks:
@@ -45,6 +48,9 @@ services:
       REACT_APP_API_URL: http://localhost:5001/api
     ports:
       - "5173:5173"
+    volumes:
+      - ./frontend:/app         # Mount backend code into container
+      - /app/node_modules      # Prevent overwriting node_modules
     depends_on:
       - backend
     networks:

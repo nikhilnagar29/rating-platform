@@ -2,7 +2,7 @@ FROM node:20
 WORKDIR /app
 
 COPY backend/package*.json ./
-RUN npm install
+RUN npm install -g nodemon && npm install
 
 COPY backend/ .
 
@@ -10,4 +10,5 @@ COPY backend/ .
 RUN apt-get update && apt-get install -y netcat-openbsd
 
 EXPOSE 5001
-CMD ["sh", "-c", "until nc -z db 5432; do echo 'Waiting for Postgres...'; sleep 2; done; node server.js"]
+CMD ["sh", "-c", "until nc -z db 5432; do echo 'Waiting for Postgres...'; sleep 2; done; nodemon server.js"]
+
