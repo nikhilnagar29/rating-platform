@@ -91,7 +91,8 @@ adminRoutes.post('/create/store', authenticate, authorize('admin'), async (req, 
     }
     owner_id = ownerIdInt; // Overwrite with parsed integer
   
-    // Validate name length
+    // Validate name length (Note: DB schema says 2-100, PDF Form Validation says Min 20 for user names, likely typo for store)
+    // Using DB schema constraint: Min 2, Max 100
     if (name.length < 2 || name.length > 100) {
       return res.status(400).json({ message: 'Store name must be between 2 and 100 characters' });
     }
@@ -101,18 +102,30 @@ adminRoutes.post('/create/store', authenticate, authorize('admin'), async (req, 
       return res.status(400).json({ message: 'Address cannot exceed 400 characters' });
     }
   
+    // Handle email: Normalize empty string to NULL for DB insertion and checks
+    let emailToInsert = null; // Default to NULL
+    if (email !== undefined && email !== null && email !== '') { // Check for actual value
+        // Basic email format validation (consider using 'validator' package for robustness)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+             return res.status(400).json({ message: 'Invalid email format.' });
+        }
+        emailToInsert = email;
+    }
+    // If email is undefined, null, or '', emailToInsert remains null
+
     // Check if owner exists and is a store owner
     const ownerExists = await db.query(
-      'SELECT id FROM users WHERE id = $1 AND role = $2',
+      'SELECT 1 FROM users WHERE id = $1 AND role = $2', // Use SELECT 1 for efficiency
       [owner_id, 'store_owner']
     );
     if (ownerExists.rows.length === 0) {
       return res.status(400).json({ message: 'Owner must exist and be a store owner' });
     }
   
-    // Check if email is unique (if provided)
-    if (email) {
-      const existingStore = await db.query('SELECT * FROM stores WHERE email = $1', [email]);
+    // Check if email is unique (if provided and not empty/null)
+    if (emailToInsert) { // Check the normalized value
+      const existingStore = await db.query('SELECT 1 FROM stores WHERE email = $1', [emailToInsert]); // Use SELECT 1
       if (existingStore.rows.length > 0) {
         return res.status(409).json({ message: 'Store email already exists' });
       }
@@ -121,29 +134,33 @@ adminRoutes.post('/create/store', authenticate, authorize('admin'), async (req, 
     // Insert store
     try {
       const result = await db.query(
-        `INSERT INTO stores (name, address, owner_id, email)
+        `INSERT INTO stores (name, address, owner_id, email) -- email column allows NULL
          VALUES ($1, $2, $3, $4)
          RETURNING id, name, address, email, owner_id, created_at`,
-        [name, address, owner_id, email]
+        [name, address, owner_id, emailToInsert] // Use the normalized email value
       );
   
       const newStore = result.rows[0];
       res.status(201).json({
         message: 'Store created successfully',
-        store: {
-          id: newStore.id,
-          name: newStore.name,
-          address: newStore.address,
-          email: newStore.email,
-          owner_id: newStore.owner_id,
-          created_at: newStore.created_at,
-        },
+        store: newStore // Return the whole object
       });
     } catch (err) {
       console.error('Error creating store:', err);
-      res.status(500).json({ message: 'Server error' });
+
+      // Handle specific database errors (e.g., unique constraint if not caught above)
+      if (err.code === '23505') { // Unique violation
+           // This could be email or potentially owner_id if there were unique constraints on owner_id per store (not the case here)
+           // More specific check could be done on err.constraint
+           if (err.constraint === 'stores_email_key') {
+                return res.status(409).json({ message: 'Store email already exists (DB constraint).' });
+           }
+           // Add checks for other unique constraints if applicable
+      }
+
+      res.status(500).json({ message: 'Server error while creating store.' });
     }
-  });
+});
 
 // GET /api/admin/users
 adminRoutes.get('/users', authenticate, authorize('admin'), async (req, res) => {
@@ -262,6 +279,26 @@ adminRoutes.get('/stores', authenticate, authorize('admin'), async (req, res) =>
         queryParams.push(`%${req.query.email}%`);
         paramIndex++;
       }
+
+      if (req.query.owner_id) {
+        const ownerId = parseInt(req.query.owner_id, 10);
+        if (!isNaN(ownerId) && ownerId > 0) {
+            baseQuery += ` AND s.owner_id = $${paramIndex}`;
+            // Make sure to add it to the countQuery as well
+            // Find the countQueryWithFilters rebuilding section and add:
+            // if (req.query.owner_id) {
+            //    countWhereClause += ` AND owner_id = $${countParamIndex}`;
+            //    countParams.push(ownerId);
+            //    countParamIndex++;
+            // }
+            // Or, simpler, add it to the main countQuery construction:
+            countQuery += ` AND s.owner_id = $${paramIndex}`; // Add this line
+            queryParams.push(ownerId);
+            paramIndex++;
+        } else {
+            return res.status(400).json({ message: 'Invalid owner_id filter value.' });
+        }
+    }
   
       if (req.query.address) {
         baseQuery += ` AND s.address ILIKE $${paramIndex}`;

@@ -8,7 +8,9 @@ import { isAuthenticated } from './utils/auth'; // Import the helper
 
 // Admin Pages
 import AdminDashboard from './pages/Admin/Dashboard';
-
+import AdminCreateUser from './pages/Admin/CreateUser'; 
+import AdminCreateStore from './pages/Admin/CreateStore'; 
+import AdminUserDetail from './pages/Admin/UserDetail';
 // User Pages
 import UserHome from './pages/User/Home';
 
@@ -76,6 +78,9 @@ function App() {
             <ProtectedRoute allowedRoles={['admin']}>
               <Routes>
                 <Route index element={<AdminDashboard />} />
+                <Route path="create/user" element={<AdminCreateUser />} />
+                <Route path="create/store/:userId" element={<AdminCreateStore />} />
+                <Route path="user/:userId" element={<AdminUserDetail />} />
                 {/* Add more admin routes here */}
               </Routes>
             </ProtectedRoute>
