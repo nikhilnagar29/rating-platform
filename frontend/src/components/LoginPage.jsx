@@ -12,9 +12,9 @@ const LoginPage = () => {
 
   // Demo credentials
   const demoCredentials = {
-    admin: { email: 'admin@og.com', password: 'admin@123' },
-    user: { email: 'user56@og.com', password: 'user@123' },
-    owner: { email: 'owener1@og.com', password: 'owener@123' },
+    admin: { email: 'admin7@og.com', password: 'Abcd@1234' },
+    user: { email: 'user1@og.com', password: 'Abcd@1234' },
+    owner: { email: 'owner1@og.com', password: 'Abcd@1234' },
   };
 
   const handleDemoLogin = (type) => {
@@ -45,7 +45,7 @@ const LoginPage = () => {
 
       // Redirect based on role
       const { role } = res.data.user;
-      if (role === 'admin') window.location.href = '/dashboard';
+      if (role === 'admin') window.location.href = '/admin';
       else if (role === 'store_owner') window.location.href = '/owner';
       else if (role === 'normal_user') window.location.href = '/user';
       else window.location.href = '/login';

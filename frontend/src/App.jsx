@@ -91,6 +91,7 @@ function App() {
             <ProtectedRoute allowedRoles={['admin']}>
               <Routes>
                 <Route index element={<AdminDashboard />} />
+                <Route path='dashboard' element={<AdminDashboard />} />
                 <Route path="create/user" element={<AdminCreateUser />} />
                 <Route path="create/store/:userId" element={<AdminCreateStore />} />
                 <Route path="user/:userId" element={<AdminUserDetail />} />

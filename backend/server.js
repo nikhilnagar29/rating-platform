@@ -5,11 +5,12 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';  // Make sure you installed: npm install cors
 import authRoutes from './routes/auth.js';
-import { registerAdmin } from './utils/registerAdmin.js';
+// import { registerAdmin } from './utils/registerAdmin.js';
 import adminRoutes from './routes/admin.js'; 
 import owenerRouter from './routes/owener.js';
 import userRouter from './routes/user.js'
-
+import { seedDemoData } from './utils/registerAdmin.js'; 
+ 
 dotenv.config();
 
 const app = express();
@@ -97,7 +98,7 @@ app.get('/health', (req, res) => {
   await connectDB();
 
   // 👇 Run once after DB is ready
-  await registerAdmin();
+  await seedDemoData();
 
   const PORT = process.env.PORT || 5001;
   app.listen(PORT, () => {
