@@ -1,135 +1,111 @@
 // frontend/src/pages/User/StoreDetail.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom'; // Removed useNavigate as we won't use it for navigation to edit page
 import axios from 'axios';
-import RatingForm from '../../components/user/RatingForm'; // Assuming you have this component
+import RatingForm from '../../components/user/RatingForm';
+import EditRatingModal from '../../components/user/EditRatingModal'; // Import the modal
 
 const UserStoreDetail = () => {
   const { storeId } = useParams();
-  const [store, setStore] = useState(null);
-  const [ratings, setRatings] = useState([]);
-  const [loadingStore, setLoadingStore] = useState(true);
-  const [loadingRatings, setLoadingRatings] = useState(true);
-  const [storeError, setStoreError] = useState(null);
-  const [ratingsError, setRatingsError] = useState(null);
-  const [userRating, setUserRating] = useState(null); // To track if user has rated
 
-  // --- Fetch Store Details ---
-  useEffect(() => {
-    const fetchStoreDetails = async () => {
-      setLoadingStore(true);
-      setStoreError(null);
-      try {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/stores/${storeId}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          },
-        });
-        setStore(response.data.store);
-      } catch (err) {
-        console.error('Error fetching store details:', err);
-        if (err.response?.status === 404) {
-            setStoreError('Store not found.');
-        } else if (err.response?.status === 400) {
-            setStoreError(err.response.data.message || 'Invalid store ID.');
+  // --- State Management ---
+  const [storeData, setStoreData] = useState({
+    store: null,
+    userRating: null,
+    allRatings: []
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showRatingForm, setShowRatingForm] = useState(false);
+  
+  // --- State for Edit Modal ---
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [ratingToEdit, setRatingToEdit] = useState(null);
+  // --------------------------
+
+  // --- Fetch All Data ---
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/stores/${storeId}/detail`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+        },
+      });
+      setStoreData(response.data);
+    } catch (err) {
+      console.error('Error fetching store detail data:', err);
+      let errorMsg = 'Failed to load store details.';
+      if (err.response) {
+        if (err.response.status === 404) {
+          errorMsg = 'Store not found.';
+        } else if (err.response.status === 400) {
+           errorMsg = err.response.data.message || 'Invalid request.';
         } else {
-            setStoreError('Failed to load store details.');
+            errorMsg = err.response.data.message || errorMsg;
         }
-      } finally {
-        setLoadingStore(false);
+      } else if (err.request) {
+        errorMsg = 'Network error. Please check your connection.';
       }
-    };
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // --- Initial Data Fetch ---
+  useEffect(() => {
     if (storeId) {
-        fetchStoreDetails();
+      fetchData();
     } else {
-        setStoreError('Store ID is missing.');
-        setLoadingStore(false);
+      setError('Store ID is missing.');
+      setLoading(false);
     }
   }, [storeId]);
 
-  // --- Fetch Ratings for this Store ---
-  useEffect(() => {
-    const fetchStoreRatings = async () => {
-      if (!storeId) return; // Don't fetch if storeId is not available
-      setLoadingRatings(true);
-      setRatingsError(null);
-      try {
-        // Fetch ratings for the specific store
-        // We'll use the general /api/user/ratings endpoint and filter by store_id
-        const params = new URLSearchParams({
-          store_id: storeId, // Add store_id filter
-          sort: 'created_at', // Sort by creation date
-          order: 'desc', // Newest first
-          page: 1,
-          limit: 100, // Fetch a reasonable number, or implement pagination if needed
-        });
-
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/ratings?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          },
-        });
-
-        setRatings(response.data.ratings);
-        // Check if the current user has a rating in the list
-        const currentUserRating = response.data.ratings.find(r => r.user_id === parseInt(localStorage.getItem('userId'))); // Assuming you store userId
-        setUserRating(currentUserRating || null);
-
-      } catch (err) {
-        console.error('Error fetching ratings for store:', err);
-        setRatingsError('Failed to load ratings for this store.');
-        setRatings([]); // Clear ratings on error
-      } finally {
-        setLoadingRatings(false);
-      }
-    };
-
-    fetchStoreRatings();
-  }, [storeId]); // Re-fetch if storeId changes
-
-  // --- Handle Rating Submission (Refresh ratings list) ---
-  const handleRatingSubmitted = async (newRating) => {
-    console.log("New rating submitted:", newRating);
-    // Update the local state to reflect the new rating
-    setUserRating(newRating);
-    // Refresh the ratings list
-    // Simple way: re-fetch ratings
-    // A more efficient way would be to add the new rating to the list locally
-    try {
-        setLoadingRatings(true);
-        const params = new URLSearchParams({
-          store_id: storeId,
-          sort: 'created_at',
-          order: 'desc',
-          page: 1,
-          limit: 100,
-        });
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/user/ratings?${params.toString()}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          },
-        });
-        setRatings(response.data.ratings);
-        setLoadingRatings(false);
-    } catch (err) {
-        console.error('Error refreshing ratings after submission:', err);
-        setRatingsError('Rating submitted, but failed to refresh the list.');
-        setLoadingRatings(false);
-    }
-    // You could also show a toast notification here
+  // --- Handle Rating Submission (Refreshes the entire page data) ---
+  const handleRatingSubmitted = (submittedRating) => {
+    console.log("New rating submitted:", submittedRating);
+    fetchData(); // Reload all data to reflect the new rating
+    setShowRatingForm(false); // Hide the form
+    // Optional: Show a success message/toast here
   };
 
-  if (loadingStore) {
+  // --- Handle Rating Update (from Modal - Refreshes the entire page data) ---
+  const handleRatingUpdated = (updatedRating) => {
+    console.log("Rating updated via modal:", updatedRating);
+    fetchData(); // Reload all data to reflect the updated rating
+    setIsEditModalOpen(false); // Close the modal
+    setRatingToEdit(null); // Clear the rating to edit
+    // Optional: Show a success message/toast here
+  };
+
+  // --- Handle Edit Button Click (Opens Modal) ---
+  const handleEditClick = () => {
+    // Set the rating to be edited and open the modal
+    if (storeData.userRating) {
+        setRatingToEdit(storeData.userRating);
+        setIsEditModalOpen(true);
+    }
+  };
+
+  // --- Handle Closing the Modal ---
+  const handleCloseModal = () => {
+    setIsEditModalOpen(false);
+    setRatingToEdit(null);
+  };
+
+  if (loading) {
     return <div className="p-6 text-center">Loading store details...</div>;
   }
 
-  if (storeError) {
+  if (error) {
     return (
       <div className="p-6">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
           <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{storeError}</span>
+          <span className="block sm:inline">{error}</span>
         </div>
         <Link to="/user" className="text-blue-500 hover:underline">
           &larr; Back to Stores
@@ -137,6 +113,8 @@ const UserStoreDetail = () => {
       </div>
     );
   }
+
+  const { store, userRating, allRatings } = storeData;
 
   if (!store) {
       return <div className="p-6 text-center">Store data could not be loaded.</div>;
@@ -159,6 +137,7 @@ const UserStoreDetail = () => {
 
       {/* Store Info Card */}
       <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-8">
+        {/* ... (store info card content remains the same) ... */}
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
           <h3 className="text-lg leading-6 font-medium text-gray-900">Store Information</h3>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">Details for {store.name}</p>
@@ -209,14 +188,14 @@ const UserStoreDetail = () => {
 
       {/* User's Rating Section */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Rating</h2>
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Your Feedback</h2>
         {userRating ? (
           <div className="bg-green-50 p-4 rounded-lg border border-green-200">
             <p className="text-green-700 font-medium">You rated this store:</p>
             <div className="flex items-center mt-2">
               {[...Array(5)].map((_, i) => (
-                <span key={i} className="text-2xl">
-                  {i < userRating.score ? '★' : '☆'}
+                <span key={i} className={`text-2xl ${i < userRating.score ? 'text-yellow-400' : 'text-gray-300'}`}>
+                  ★
                 </span>
               ))}
               <span className="ml-2 text-lg font-bold text-green-800">{userRating.score}/5</span>
@@ -227,48 +206,53 @@ const UserStoreDetail = () => {
             <p className="text-xs text-gray-500 mt-2">
               Rated on: {new Date(userRating.created_at).toLocaleDateString()}
             </p>
-            {/* Link to edit rating if needed */}
-            {/* <Link to={`/user/edit/rating/${userRating.rating_id}`} className="mt-2 inline-block text-sm text-blue-500 hover:underline">
-              Edit your rating
-            </Link> */}
+            {/* --- Changed button onClick handler --- */}
+            <button
+              onClick={handleEditClick} // Opens the modal instead of navigating
+              className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Edit Feedback
+            </button>
+            {/* ------------------------------------ */}
           </div>
-        ) : (
+        ) : showRatingForm ? (
           <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
             <h3 className="text-lg font-medium text-gray-700 mb-4">Rate this Store</h3>
+            {/* --- Use the new handler for submission --- */}
             <RatingForm storeId={storeId} storeName={store.name} onRatingSubmitted={handleRatingSubmitted} />
+            {/* --------------------------------------- */}
+          </div>
+        ) : (
+          <div className="bg-gray-100 p-6 rounded-lg border border-gray-300 text-center">
+            <p className="text-gray-700 mb-4">You haven't rated this store yet.</p>
+            <button
+              onClick={() => setShowRatingForm(true)}
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Give Feedback
+            </button>
           </div>
         )}
       </section>
 
-      {/* Ratings List Section */}
+      {/* Ratings List Section (Feedback from Others) */}
       <section>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Ratings for {store.name}</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Feedback from Others</h2>
           <span className="text-sm text-gray-600">
-            {ratings.length} {ratings.length === 1 ? 'Rating' : 'Ratings'}
+            {allRatings.length} {allRatings.length === 1 ? 'Rating' : 'Ratings'}
           </span>
         </div>
 
-        {loadingRatings ? (
-          <div className="p-4 text-center bg-gray-50 rounded-lg">Loading ratings...</div>
-        ) : ratingsError ? (
-          <div className="p-4 text-center text-red-500 bg-red-50 rounded-lg">
-            Error: {ratingsError}
-            <button
-              onClick={() => window.location.reload()} // Simple retry
-              className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-            >
-              Retry
-            </button>
-          </div>
-        ) : ratings.length === 0 ? (
+        {allRatings.length === 0 ? (
           <div className="p-6 text-center text-gray-500 bg-gray-50 rounded-lg">
-            No ratings yet for this store. Be the first!
+            No feedback yet from other users.
           </div>
         ) : (
           <div className="space-y-4">
-            {ratings.map((rating) => (
+            {allRatings.map((rating) => (
               <div key={rating.rating_id} className="bg-white p-4 rounded-lg shadow border border-gray-200">
+                {/* ... (ratings list content remains the same) ... */}
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center">
@@ -288,13 +272,23 @@ const UserStoreDetail = () => {
                   </span>
                 </div>
                 <div className="mt-2 text-sm text-gray-500">
-                  By: <span className="font-medium">{rating.user_name || 'Anonymous User'}</span> {/* You might need to fetch user name */}
+                  By: <span className="font-medium">{rating.user_name || 'A User'}</span>
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {/* --- Render the Edit Modal if it's open --- */}
+      {isEditModalOpen && ratingToEdit && (
+        <EditRatingModal
+          rating={ratingToEdit}
+          onClose={handleCloseModal}
+          onRatingUpdated={handleRatingUpdated} // Use the specific handler for updates
+        />
+      )}
+      {/* ----------------------------------------- */}
     </div>
   );
 };

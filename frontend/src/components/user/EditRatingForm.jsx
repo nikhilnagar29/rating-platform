@@ -1,13 +1,33 @@
 // frontend/src/components/user/EditRatingForm.jsx
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
+  // --- ADD A GUARD CLAUSE AT THE VERY BEGINNING ---
+  // Check if initialRating is provided and is an object.
+  // If not, render an error message or return null to prevent the error.
+  if (!initialRating || typeof initialRating !== 'object') {
+    console.error('EditRatingForm: initialRating prop is missing or invalid:', initialRating);
+    return (
+      <div className="bg-white p-6 rounded-2xl shadow-md border border-red-200">
+        <p className="text-red-500">Error: Rating data is not available for editing.</p>
+        <Link to="/user" className="mt-4 inline-block text-blue-500 hover:underline">
+          &larr; Back to Store List
+        </Link>
+      </div>
+    );
+    // Alternatively, you could just return null to render nothing:
+    // return null;
+  }
+  // --- END OF GUARD CLAUSE ---
+
+  // Now it's safe to destructure or access properties
   const [score, setScore] = useState(initialRating.score);
-  const [text, setText] = useState(initialRating.text || ''); // Handle potential null text
+  const [text, setText] = useState(initialRating.text || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
-  const [submissionStatus, setSubmissionStatus] = useState(null); // 'success' or 'error'
+  const [submissionStatus, setSubmissionStatus] = useState(null);
 
   const handleStarClick = (selectedScore) => {
     setScore(selectedScore);
@@ -19,7 +39,6 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
     setSubmissionStatus(null);
     setMessage('');
 
-    // Basic client-side validation (same as create)
     if (score < 1 || score > 5) {
       setMessage('Please select a rating between 1 and 5 stars.');
       setSubmissionStatus('error');
@@ -28,8 +47,10 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
     }
 
     try {
+      console.log("Hello ji");
+      console.log("Submitting rating update for ID:", initialRating.rating_id); // Debug log
       const response = await axios.put(
-        `${import.meta.env.VITE_API_URL}/user/rating/${initialRating.rating_id}`,
+        `${import.meta.env.VITE_API_URL}/user/edit/rating/${initialRating.rating_id}`,
         { score, text },
         {
           headers: {
@@ -43,7 +64,6 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
       setMessage(response.data.message || 'Rating updated successfully!');
       setSubmissionStatus('success');
 
-      // Notify parent component
       if (onRatingUpdated) {
         onRatingUpdated(response.data.rating);
       }
@@ -53,7 +73,7 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
       let errorMsg = 'Failed to update rating. Please try again.';
       if (err.response) {
         if (err.response.status === 404) {
-          errorMsg = err.response.data.message || 'Rating not found.';
+          errorMsg = err.response.data.message || 'Rating not found or access denied.';
         } else if (err.response.status === 400) {
           errorMsg = err.response.data.message || 'Invalid rating data.';
         } else {
@@ -78,7 +98,6 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Star Rating Selection (Pre-filled) */}
         <div>
           <label className="block text-lg font-medium text-gray-700 mb-2">
             Your Rating <span className="text-red-500">*</span>
@@ -105,7 +124,6 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
           </p>
         </div>
 
-        {/* Comment Textarea (Pre-filled) */}
         <div>
           <label htmlFor="ratingComment" className="block text-sm font-medium text-gray-700 mb-1">
             Comment (Optional)
@@ -127,7 +145,6 @@ const EditRatingForm = ({ initialRating, storeName, onRatingUpdated }) => {
            )}
         </div>
 
-        {/* Submit Button */}
         <div className="flex justify-center space-x-4">
           <button
             type="submit"

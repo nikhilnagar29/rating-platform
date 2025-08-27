@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+import { Link } from 'react-router-dom';
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -154,6 +156,16 @@ const LoginPage = () => {
             Store Owner
           </button>
         </div>
+      </div>
+
+      {/* // Inside your login form, perhaps below the login button or in a footer section */}
+      <div className="text-sm text-center mt-8">
+        <p className="text-gray-600">
+          Don't have an account?{' '}
+          <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+            Sign up
+          </Link>
+        </p>
       </div>
 
       {/* Optional: Auto-submit version */}

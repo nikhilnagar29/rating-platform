@@ -5,6 +5,8 @@ import LoginPage from './components/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import { isAuthenticated } from './utils/auth'; // Import the helper
+import ChangePassword from './pages/ChangePassword';
+import Register from './pages/Register'; 
 
 // Admin Pages
 import AdminDashboard from './pages/Admin/Dashboard';
@@ -15,8 +17,9 @@ import AdminStoreDetail from './pages/Admin/StoreDetail';
 
 // User Pages
 import UserHome from './pages/User/Home';
-import EditRatingPage from './components/user/RatingForm';
+import EditRatingPage from './components/user/EditRatingForm';
 import UserStoreDetail from './pages/User/StoreDetail';
+import MyRatings from './pages/User/MyRatings';
 
 // Owner Pages
 import OwnerDashboard from './pages/Owner/Dashboard';
@@ -73,6 +76,11 @@ function App() {
           path="/login"
           element={isAuthenticated() ? <Navigate to={`/${user?.role === 'admin' ? 'admin' : user?.role === 'normal_user' ? 'user' : 'owner'}`} replace /> : <LoginPage />}
         />
+        <Route
+          path="/register"
+          element={isAuthenticated() ? <Navigate to={`/${user?.role === 'admin' ? 'admin' : user?.role === 'normal_user' ? 'user' : 'owner'}`} replace /> : <Register />}
+        />
+        {/* <Route path="/register" element={<Register />} /> */}
 
         {/* Protected Routes */}
         {/* Admin Routes */}
@@ -99,8 +107,10 @@ function App() {
             <ProtectedRoute allowedRoles={['normal_user']}>
               <Routes>
                 <Route index element={<UserHome />} />
-                <Route path="edit/rating/:ratingId" element={<EditRatingPage />} />
+                {/* <Route path="edit/rating/:ratingId" element={<EditRatingPage />} /> */}
                 <Route path="stores/:storeId" element={<UserStoreDetail />} />
+                <Route path="change-password" element={<ChangePassword />} />
+                <Route path="my-ratings" element={<MyRatings />} />
                 {/* Add more user routes here */}
               </Routes>
             </ProtectedRoute>
@@ -114,6 +124,7 @@ function App() {
             <ProtectedRoute allowedRoles={['store_owner']}>
               <Routes>
                 <Route index element={<OwnerDashboard />} />
+                <Route path="change-password" element={<ChangePassword />} />
                 {/* Add more owner routes here */}
               </Routes>
             </ProtectedRoute>
