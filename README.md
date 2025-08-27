@@ -119,11 +119,11 @@ The system automatically seeds with test accounts:
 
 | Email | Password | Role | Permissions |
 |-------|----------|------|-------------|
-| admin1@og.com | admin123 | admin | Full system access |
-| owner1@og.com | owner123 | store_owner | Manage own stores |
-| owner2@og.com | owner123 | store_owner | Manage own stores |
-| user1@og.com | user123 | normal_user | View stores, submit ratings |
-| user2@og.com | user123 | normal_user | View stores, submit ratings |
+| admin1@og.com | Abcd@1234 | admin | Full system access |
+| owner1@og.com | Abcd@1234 | store_owner | Manage own stores |
+| owner2@og.com | Abcd@1234 | store_owner | Manage own stores |
+| user1@og.com | Abcd@1234 | normal_user | View stores, submit ratings |
+| user2@og.com | Abcd@1234 | normal_user | View stores, submit ratings |
 
 ## API Documentation
 
