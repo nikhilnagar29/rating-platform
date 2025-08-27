@@ -53,7 +53,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/user', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/owener' , owenerRouter);
+app.use('/api/owner' , owenerRouter);
 app.use('/api/user' , userRouter) ;
 
 // DB Connection

@@ -23,6 +23,7 @@ import MyRatings from './pages/User/MyRatings';
 
 // Owner Pages
 import OwnerDashboard from './pages/Owner/Dashboard';
+import OwnerStoreDetail from './pages/Owner/StoreDetail'; 
 
 // Other
 import NotFound from './pages/NotFound';
@@ -124,7 +125,9 @@ function App() {
             <ProtectedRoute allowedRoles={['store_owner']}>
               <Routes>
                 <Route index element={<OwnerDashboard />} />
-                <Route path="change-password" element={<ChangePassword />} />
+                {/* --- Add the Change Password Route for Owners --- */}
+                <Route path="change-password" element={<ChangePassword />} /> {/* <-- For Owners */}
+                <Route path="store/:storeId" element={<OwnerStoreDetail />} />
                 {/* Add more owner routes here */}
               </Routes>
             </ProtectedRoute>

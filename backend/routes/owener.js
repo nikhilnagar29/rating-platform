@@ -117,7 +117,7 @@ owenerRouter.get('/stores', authenticate, authorize('store_owner'), async (req, 
             ORDER BY s.created_at DESC;
         `;
 
-        const storesResult = await db.query(storesQuery, [ownerId]);
+        const storesResult = await db.query(storesQuery, [ownerId]); // Pass ownerId as $1
         const stores = storesResult.rows;
 
         // 2. If no stores found, return empty list
@@ -128,8 +128,10 @@ owenerRouter.get('/stores', authenticate, authorize('store_owner'), async (req, 
         // 3. Fetch recent ratings for each store
         // We'll fetch the most recent 5 ratings per store
         const storeIds = stores.map(store => store.id);
-        // Create placeholders for the IN clause: ($1, $2, $3, ...)
-        const placeholders = storeIds.map((_, index) => `$${index + 1}`).join(', ');
+        
+        // --- CORRECTED PART ---
+        // Create the ratings query using ANY with an array parameter
+        // Pass the storeIds ARRAY as a SINGLE parameter ($1)
         const ratingsQuery = `
             SELECT
                 r.rating_id,
@@ -142,14 +144,16 @@ owenerRouter.get('/stores', authenticate, authorize('store_owner'), async (req, 
                 u.email AS user_email
             FROM ratings r
             JOIN users u ON r.user_id = u.id
-            WHERE r.store_id = ANY($${storeIds.length + 1}) -- Use ANY with array
+            WHERE r.store_id = ANY($1) -- Pass the array as the first parameter
               AND r.status = 'active'
             ORDER BY r.created_at DESC
         `;
 
-        // Execute ratings query for all relevant store IDs
-        const ratingsResult = await db.query(ratingsQuery, [...storeIds]); // Spread storeIds into params
+        // Execute ratings query, passing the storeIds array as the FIRST parameter
+        // PostgreSQL understands JS arrays when passed this way to ANY()
+        const ratingsResult = await db.query(ratingsQuery, [storeIds]); // Pass storeIds array as $1
         const allRatings = ratingsResult.rows;
+        // --- END OF CORRECTED PART ---
 
         // 4. Group ratings by store_id for easier assignment
         const ratingsByStoreId = {};
@@ -176,6 +180,7 @@ owenerRouter.get('/stores', authenticate, authorize('store_owner'), async (req, 
         });
     } catch (err) {
         console.error('Error fetching detailed owner stores:', err);
+        // Send a more generic error message to the client
         res.status(500).json({ message: 'Server error while fetching store details.' });
     }
 });
@@ -263,6 +268,94 @@ owenerRouter.get('/store/:store_id', authenticate, authorize('store_owner'), asy
     } catch (err) {
         console.error('Error fetching owner store details:', err);
         res.status(500).json({ message: 'Server error while fetching store details.' });
+    }
+});
+
+// GET /api/owner/dashboard/ratings
+// Fetch ratings for all stores owned by the authenticated store owner
+owenerRouter.get('/dashboard/ratings', authenticate, authorize('store_owner'), async (req, res) => {
+    try {
+        const ownerId = req.user.id; // Get authenticated store owner's ID
+
+        // Query to get ratings for stores owned by the user
+        // Joins stores, ratings, and users tables to get all necessary details
+        const ratingsQuery = `
+            SELECT
+                s.id AS store_id,
+                s.name AS store_name,
+                s.address AS store_address,
+                s.email AS store_email,
+                u.id AS user_id,
+                u.name AS user_name,
+                u.email AS user_email,
+                u.address AS user_address,
+                r.rating_id,
+                r.score,
+                r.text,
+                r.likes_count,
+                r.status,
+                r.created_at AS rating_created_at,
+                r.updated_at AS rating_updated_at,
+                COALESCE(ROUND(AVG(ra.score), 2), 0) AS store_average_rating -- Calculate avg rating for the store
+            FROM stores s
+            JOIN ratings r ON s.id = r.store_id
+            JOIN users u ON r.user_id = u.id
+            LEFT JOIN ratings ra ON s.id = ra.store_id AND ra.status = 'active' -- Join again for average calculation
+            WHERE s.owner_id = $1 -- Filter by owner ID
+              AND r.status = 'active' -- Only fetch active ratings
+            GROUP BY s.id, u.id, r.rating_id -- Group by store, user, and rating to get individual ratings
+            ORDER BY s.name ASC, r.created_at DESC; -- Order by store name, then by rating date (newest first)
+        `;
+
+        const ratingsResult = await db.query(ratingsQuery, [ownerId]);
+
+        // Transform the flat result into a nested structure: { store_id: { store_info, ratings: [...] } }
+        const storeRatingsMap = {};
+
+        ratingsResult.rows.forEach(row => {
+            const storeId = row.store_id;
+
+            if (!storeRatingsMap[storeId]) {
+                storeRatingsMap[storeId] = {
+                    store: {
+                        id: row.store_id,
+                        name: row.store_name,
+                        address: row.store_address,
+                        email: row.store_email,
+                        average_rating: parseFloat(row.store_average_rating) // Convert to number
+                    },
+                    ratings: []
+                };
+            }
+
+            // Add the rating details for this user/store combination
+            storeRatingsMap[storeId].ratings.push({
+                rating_id: row.rating_id,
+                score: row.score,
+                text: row.text,
+                likes_count: row.likes_count,
+                status: row.status,
+                created_at: row.rating_created_at,
+                updated_at: row.rating_updated_at,
+                user: {
+                    id: row.user_id,
+                    name: row.user_name,
+                    email: row.user_email,
+                    address: row.user_address
+                }
+            });
+        });
+
+        // Convert the map to an array of store objects
+        const storesWithRatings = Object.values(storeRatingsMap);
+
+        res.json({
+            stores: storesWithRatings
+        });
+
+    } catch (err) {
+        console.error('Error fetching owner dashboard ratings:', err);
+        res.status(500).json({ message: 'Server error while fetching dashboard data.' });
     }
 });
 
