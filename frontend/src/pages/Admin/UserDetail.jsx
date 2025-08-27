@@ -159,16 +159,21 @@ const UserDetail = () => {
 
       {user.role === 'store_owner' && (
         <section>
-          <h2 className="text-xl font-semibold text-gray-700 mb-4">Stores Owned by {user.name}</h2>
+        <h2 className="text-xl font-semibold text-gray-700 mb-4">Stores Owned by {user.name}</h2>
+        <div className="bg-white p-4 rounded-lg shadow-sm">
           {/* 
-            Pass specific props to StoreTable to filter by owner_id.
-            We can pass initial filters.
+            Pass the specific API URL for fetching stores by owner ID.
+            Pass hideOwnerColumn to simplify the table view.
+            No need for initialFilters as the backend handles the filtering.
           */}
-          <div className="bg-white p-4 rounded-lg shadow-sm">
-            {/* Pass initial filter for owner_id */}
-            <StoreTable initialFilters={{ owner_id: user.id }} hideOwnerColumn={true} />
-          </div>
-        </section>
+          <StoreTable
+            apiUrl={`/admin/stores/owner/${user.id}`} // Use the new endpoint
+            hideOwnerColumn={true}                   // Hide Owner ID column as it's implied
+            // initialFilters={{ owner_id: user.id }} // Not needed with specific apiUrl
+            // hideOwnerColumn={true}                // Already passed
+          />
+        </div>
+      </section>
       )}
 
       {/* Optional: Add sections for 'admin' role if needed in the future */}

@@ -268,6 +268,7 @@ adminRoutes.get('/stores', authenticate, authorize('admin'), async (req, res) =>
       let paramIndex = 1;
   
       // --- Apply Filters ---
+
       if (req.query.name) {
         baseQuery += ` AND s.name ILIKE $${paramIndex}`;
         queryParams.push(`%${req.query.name}%`);
@@ -280,25 +281,7 @@ adminRoutes.get('/stores', authenticate, authorize('admin'), async (req, res) =>
         paramIndex++;
       }
 
-      if (req.query.owner_id) {
-        const ownerId = parseInt(req.query.owner_id, 10);
-        if (!isNaN(ownerId) && ownerId > 0) {
-            baseQuery += ` AND s.owner_id = $${paramIndex}`;
-            // Make sure to add it to the countQuery as well
-            // Find the countQueryWithFilters rebuilding section and add:
-            // if (req.query.owner_id) {
-            //    countWhereClause += ` AND owner_id = $${countParamIndex}`;
-            //    countParams.push(ownerId);
-            //    countParamIndex++;
-            // }
-            // Or, simpler, add it to the main countQuery construction:
-            countQuery += ` AND s.owner_id = $${paramIndex}`; // Add this line
-            queryParams.push(ownerId);
-            paramIndex++;
-        } else {
-            return res.status(400).json({ message: 'Invalid owner_id filter value.' });
-        }
-    }
+      
   
       if (req.query.address) {
         baseQuery += ` AND s.address ILIKE $${paramIndex}`;
@@ -390,6 +373,63 @@ adminRoutes.get('/stores', authenticate, authorize('admin'), async (req, res) =>
     } catch (err) {
       console.error('Error fetching stores:', err);
       res.status(500).json({ message: 'Server error while fetching stores.' });
+    }
+  });
+
+  // GET /api/admin/stores/owner/:ownerId
+// Fetches all stores owned by a specific user (owner).
+// This endpoint is specifically designed for the Admin User Detail page.
+adminRoutes.get('/stores/owner/:ownerId', authenticate, authorize('admin'), async (req, res) => {
+    const ownerId = parseInt(req.params.ownerId, 10);
+  
+    // Validate ID parameter
+    if (isNaN(ownerId) || ownerId <= 0) {
+      return res.status(400).json({ message: 'Invalid owner ID provided.' });
+    }
+  
+    try {
+      // Query to get stores for the given owner_id and calculate average rating
+      // This query is simpler and less prone to modification errors.
+      const storeQuery = `
+        SELECT
+          s.id,
+          s.name,
+          s.address,
+          s.email,
+          s.owner_id,
+          s.created_at,
+          COALESCE(ROUND(AVG(r.score), 2), 0) AS average_rating -- Round to 2 decimal places
+        FROM stores s
+        LEFT JOIN ratings r ON s.id = r.store_id AND r.status = 'active'
+        WHERE s.owner_id = $1 -- Filter directly by owner_id
+        GROUP BY s.id -- Group by store ID for aggregation
+        ORDER BY s.created_at DESC; -- Default order, can be made dynamic if needed
+      `;
+  
+      const result = await db.query(storeQuery, [ownerId]); // Pass ownerId as parameter
+  
+      // Note: For simplicity, this version doesn't implement pagination.
+      // If an owner can have many stores (though schema implies one-to-many owner-store),
+      // pagination can be added later.
+  
+      // Check if any stores were found
+      if (result.rows.length === 0) {
+          // This isn't necessarily an error, just no stores found for this owner.
+          // Return an empty array.
+          return res.json({
+              stores: [],
+              message: `No stores found for owner ID ${ownerId}.`
+          });
+      }
+  
+      res.json({
+        stores: result.rows,
+        // If you decide to add pagination later:
+        // pagination: { ... }
+      });
+    } catch (err) {
+      console.error(`Error fetching stores for owner ID ${ownerId}:`, err);
+      res.status(500).json({ message: 'Server error while fetching stores for owner.' });
     }
   });
 
