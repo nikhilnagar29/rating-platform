@@ -1,87 +1,10 @@
 // backend/routes/user.js
 import express from 'express';
-import bcrypt from 'bcrypt';
 import { db } from '../config/db.js'; // Import your database pool
-import { authenticate } from '../middleware/auth.js'; // Import your auth middleware
+import { authenticate , authorize} from '../middleware/auth.js'; // Import your auth middleware
 
 const userRouter = express.Router();
 
-// Helper function for password validation (matches PDF requirements)
-const validatePassword = (password) => {
-  const minLength = 8;
-  const maxLength = 16;
-  const hasUpperCase = /[A-Z]/.test(password);
-  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password); // Basic special char check
-
-  if (password.length < minLength || password.length > maxLength) {
-      return 'Password must be between 8 and 16 characters long.';
-  }
-  if (!hasUpperCase) {
-      return 'Password must contain at least one uppercase letter.';
-  }
-  if (!hasSpecialChar) {
-      return 'Password must contain at least one special character.';
-  }
-  return null; // Valid password
-};
-
-// Apply authentication middleware to routes that need it
-// This ensures only logged-in users can access these endpoints
-// POST /api/user/change-password
-userRouter.post('/change-password', authenticate, async (req, res) => {
-  const { oldPassword, newPassword, confirmPassword } = req.body;
-  const userId = req.user?.id; // Get user ID from the authenticated token (using optional chaining)
-
-  // 1. Basic Input Validation
-  if (!oldPassword || !newPassword || !confirmPassword) {
-      return res.status(400).json({ message: 'Old password, new password, and confirm password are required.' });
-  }
-
-  if (newPassword !== confirmPassword) {
-      return res.status(400).json({ message: 'New password and confirm password do not match.' });
-  }
-
-  // 2. Validate New Password Strength
-  const passwordValidationError = validatePassword(newPassword);
-  if (passwordValidationError) {
-      return res.status(400).json({ message: passwordValidationError });
-  }
-
-  try {
-      // 3. Fetch Current Hashed Password from DB
-      const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
-      if (userResult.rows.length === 0) {
-          // This shouldn't happen if auth is working, but good defensive check
-          return res.status(404).json({ message: 'User not found.' });
-      }
-      const currentHashedPassword = userResult.rows[0].password_hash;
-
-      // 4. Verify Old Password
-      const isMatch = await bcrypt.compare(oldPassword, currentHashedPassword);
-      if (!isMatch) {
-          return res.status(400).json({ message: 'Incorrect old password.' });
-      }
-
-      // 5. Hash the New Password
-      const saltRounds = 10; // Standard practice
-      const newHashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-      // 6. Update Password in Database
-      // Note: updated_at trigger should handle the timestamp update
-      await db.query(
-          'UPDATE users SET password_hash = $1 WHERE id = $2',
-          [newHashedPassword, userId]
-      );
-
-      // 7. Respond with Success
-      res.status(200).json({ message: 'Password updated successfully.' });
-
-  } catch (error) {
-      console.error('Error changing password:', error);
-      // Provide a more generic error message to the client
-      res.status(500).json({ message: 'Internal server error while changing password.' });
-  }
-});
 
 // GET /api/user/stores
 userRouter.get('/stores', authenticate, async (req, res) => {

@@ -7,6 +7,7 @@ import cors from 'cors';  // Make sure you installed: npm install cors
 import authRoutes from './routes/auth.js';
 import { registerAdmin } from './utils/registerAdmin.js';
 import adminRoutes from './routes/admin.js'; 
+import owenerRouter from './routes/owener.js';
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/user', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/owener' , owenerRouter);
 
 // DB Connection
 let pool;
