@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';  // Make sure you installed: npm install cors
 import authRoutes from './routes/auth.js';
 import { registerAdmin } from './utils/registerAdmin.js';
-
+import adminRoutes from './routes/admin.js'; 
 
 dotenv.config();
 
@@ -50,6 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/user', authRoutes);
+app.use('/api/admin', adminRoutes);
 
 // DB Connection
 let pool;
@@ -93,7 +94,7 @@ app.get('/health', (req, res) => {
 
   // 👇 Run once after DB is ready
   await registerAdmin();
-  
+
   const PORT = process.env.PORT || 5001;
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);

@@ -17,17 +17,16 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    console.log("1th")
+
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    console.log("2th")
+
     if (result.rows.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-    console.log("3th")
-    console.log("hello ")
+
 
     const user = result.rows[0];
-    console.log("=> " , user)
+
     const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
