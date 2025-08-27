@@ -335,6 +335,93 @@ userRouter.get('/ratings', authenticate, async (req, res) => {
     }
 });
 
+// GET /api/user/stores/:storeId/ratings
+// Fetch ratings for a specific store (visible to users)
+userRouter.get('/stores/:storeId/ratings', authenticate, async (req, res) => {
+    const storeId = parseInt(req.params.storeId, 10);
+    if (isNaN(storeId) || storeId <= 0) {
+        return res.status(400).json({ message: 'Invalid store ID provided.' });
+    }
+
+    try {
+        // --- ADDED: Check if the store exists ---
+        const storeCheckResult = await db.query('SELECT 1 FROM stores WHERE id = $1', [storeId]);
+        if (storeCheckResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Store not found.' });
+        }
+        // --- END ADDITION ---
+
+        // Base query to select ratings for the store and join with user name
+        let baseQuery = `
+            SELECT
+                r.rating_id,
+                r.store_id,
+                r.user_id,
+                u.name AS user_name, -- Get user name
+                r.score,
+                r.text,
+                r.created_at,
+                r.updated_at
+            FROM ratings r
+            JOIN users u ON r.user_id = u.id -- Join to get user name
+            WHERE r.store_id = $1 -- Filter by store ID
+              AND r.status = 'active' -- Only fetch active ratings
+        `;
+        const countQuery = `SELECT COUNT(*) FROM ratings r WHERE r.store_id = $1 AND r.status = 'active'`;
+
+        const queryParams = [storeId];
+        let paramIndex = 2; // Start from 2 as $1 is storeId
+
+        // --- Apply Sorting ---
+        const validSortFields = ['score', 'created_at', 'updated_at']; // Include updated_at
+        // Default sort by created_at DESC if not specified or invalid
+        let sortField = 'created_at';
+        let order = 'DESC';
+        if (req.query.sort && validSortFields.includes(req.query.sort)) {
+            sortField = req.query.sort;
+        }
+        if (req.query.order && (req.query.order.toLowerCase() === 'asc' || req.query.order.toLowerCase() === 'desc')) {
+             order = req.query.order.toUpperCase();
+        }
+        // Use 'r.' prefix for fields from the ratings table
+        baseQuery += ` ORDER BY r.${sortField} ${order}`;
+
+
+        // --- Apply Pagination ---
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 10;
+        // Ensure page and limit are positive
+        const validPage = page > 0 ? page : 1;
+        const validLimit = limit > 0 ? limit : 10;
+
+        const offset = (validPage - 1) * validLimit;
+        baseQuery += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+        queryParams.push(validLimit, offset);
+
+        // --- Execute Queries ---
+        const countResult = await db.query(countQuery, [storeId]);
+        const totalRatings = parseInt(countResult.rows[0].count, 10);
+
+        const result = await db.query(baseQuery, queryParams);
+
+        res.json({
+            ratings: result.rows,
+            pagination: {
+                currentPage: validPage,
+                totalPages: Math.ceil(totalRatings / validLimit),
+                totalRatings,
+                hasNext: validPage < Math.ceil(totalRatings / validLimit),
+                hasPrev: validPage > 1,
+            },
+        });
+    } catch (err) {
+        console.error(`Error fetching ratings for store ID ${storeId}:`, err);
+        // Send a more generic error message to the client
+        res.status(500).json({ message: 'Server error while fetching store ratings.' });
+    }
+});
+
+
 // POST /api/user/rate/:store_id
 userRouter.post('/rate/:store_id', authenticate, async (req, res) => {
     const userId = req.user.id; // Get authenticated user's ID
@@ -498,5 +585,114 @@ userRouter.put('/edit/rating/:rating_id', authenticate, async (req, res) => {
     }
 });
 
+// GET /api/user/rating/:ratingId
+// Fetch details of a specific rating submitted by the user
+userRouter.get('/rating/:ratingId', authenticate, async (req, res) => {
+    const userId = req.user.id; // Get authenticated user's ID
+    const ratingId = parseInt(req.params.ratingId, 10);
+  
+    // 1. Validate Path Parameter (rating_id)
+    if (isNaN(ratingId) || ratingId <= 0) {
+      return res.status(400).json({ message: 'Invalid rating ID provided.' });
+    }
+  
+    try {
+      // 2. Query to get the specific rating details, ensuring it belongs to the user
+      // Also fetch store name for context on the frontend
+      const ratingResult = await db.query(
+        `SELECT
+           r.rating_id,
+           r.store_id,
+           s.name AS store_name, -- Get store name
+           r.user_id,
+           r.score,
+           r.text,
+           r.status,
+           r.created_at,
+           r.updated_at
+         FROM ratings r
+         JOIN stores s ON r.store_id = s.id -- Join to get store name
+         WHERE r.rating_id = $1 AND r.user_id = $2`, // Ensure rating belongs to user
+        [ratingId, userId]
+      );
+  
+      // 3. Check if rating was found
+      if (ratingResult.rows.length === 0) {
+          // Either rating doesn't exist or doesn't belong to this user
+          return res.status(404).json({ message: 'Rating not found or access denied.' });
+      }
+  
+      const rating = ratingResult.rows[0];
+  
+      // 4. Respond with rating details
+      res.json({ rating });
+  
+    } catch (err) {
+      console.error(`Error fetching rating details for ID ${ratingId} (User: ${userId}):`, err);
+      res.status(500).json({ message: 'Server error while fetching rating details.' });
+    }
+  });
 
-export default router;
+  // PUT /api/user/rating/:ratingId
+// Update an existing rating submitted by the user
+userRouter.put('/rating/:ratingId', authenticate, async (req, res) => {
+    const userId = req.user.id; // Get authenticated user's ID
+    const ratingId = parseInt(req.params.ratingId, 10);
+    const { score, text } = req.body;
+  
+    // 1. Validate Path Parameter (rating_id)
+    if (isNaN(ratingId) || ratingId <= 0) {
+      return res.status(400).json({ message: 'Invalid rating ID provided.' });
+    }
+  
+    // 2. Validate Request Body
+    // Check if score is provided and is a valid integer between 1 and 5
+    if (score === undefined || score === null || !Number.isInteger(score) || score < 1 || score > 5) {
+      return res.status(400).json({ message: 'Score is required and must be an integer between 1 and 5.' });
+    }
+  
+    // Handle text: ensure it's a string, default to empty string if not provided or null/undefined
+    let ratingText = "";
+    if (text !== undefined && text !== null) {
+      if (typeof text !== 'string') {
+        return res.status(400).json({ message: 'Text must be a string.' });
+      }
+      ratingText = text;
+    }
+    // If text is undefined or null, ratingText remains ""
+  
+    try {
+      // 3. Check if the Rating Exists and Belongs to the User
+      const ratingExistsResult = await db.query(
+        'SELECT rating_id, store_id FROM ratings WHERE rating_id = $1 AND user_id = $2',
+        [ratingId, userId]
+      );
+      if (ratingExistsResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Rating not found or access denied.' });
+      }
+      const storeId = ratingExistsResult.rows[0].store_id; // Get store ID for response
+  
+      // 4. Update the Rating
+      // The UNIQUE (store_id, user_id) constraint is already satisfied as we are updating
+      const updateResult = await db.query(
+        `UPDATE ratings
+         SET score = $1, text = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE rating_id = $3 AND user_id = $4
+         RETURNING rating_id, store_id, user_id, score, text, likes_count, status, created_at, updated_at`,
+        [score, ratingText, ratingId, userId]
+      );
+  
+      const updatedRating = updateResult.rows[0];
+  
+      // 5. Respond with Success
+      res.json({ message: 'Rating updated successfully.', rating: updatedRating });
+  
+    } catch (error) {
+      console.error('Error updating rating:', error);
+      // 6. Generic Server Error
+      res.status(500).json({ message: 'Internal server error while updating rating.' });
+    }
+  });
+
+
+export default userRouter;

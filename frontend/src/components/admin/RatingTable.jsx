@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 // --- Update the props destructuring ---
-const RatingTable = ({ initialFilters = {}, hideUserColumns = false }) => {
+const RatingTable = ({ initialFilters = {}, hideUserColumns = false, hideStoreColumns = false }) => {
   // --- State for data and UI ---
   const [ratings, setRatings] = useState([]);
   const [loading, setLoading] = useState(false);

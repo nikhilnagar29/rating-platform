@@ -11,8 +11,12 @@ import AdminDashboard from './pages/Admin/Dashboard';
 import AdminCreateUser from './pages/Admin/CreateUser'; 
 import AdminCreateStore from './pages/Admin/CreateStore'; 
 import AdminUserDetail from './pages/Admin/UserDetail';
+import AdminStoreDetail from './pages/Admin/StoreDetail';
+
 // User Pages
 import UserHome from './pages/User/Home';
+import EditRatingPage from './components/user/RatingForm';
+import UserStoreDetail from './pages/User/StoreDetail';
 
 // Owner Pages
 import OwnerDashboard from './pages/Owner/Dashboard';
@@ -81,6 +85,7 @@ function App() {
                 <Route path="create/user" element={<AdminCreateUser />} />
                 <Route path="create/store/:userId" element={<AdminCreateStore />} />
                 <Route path="user/:userId" element={<AdminUserDetail />} />
+                <Route path="store/:storeId" element={<AdminStoreDetail />} />
                 {/* Add more admin routes here */}
               </Routes>
             </ProtectedRoute>
@@ -94,6 +99,8 @@ function App() {
             <ProtectedRoute allowedRoles={['normal_user']}>
               <Routes>
                 <Route index element={<UserHome />} />
+                <Route path="edit/rating/:ratingId" element={<EditRatingPage />} />
+                <Route path="stores/:storeId" element={<UserStoreDetail />} />
                 {/* Add more user routes here */}
               </Routes>
             </ProtectedRoute>

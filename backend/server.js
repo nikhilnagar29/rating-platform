@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import { registerAdmin } from './utils/registerAdmin.js';
 import adminRoutes from './routes/admin.js'; 
 import owenerRouter from './routes/owener.js';
+import userRouter from './routes/user.js'
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/user', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/owener' , owenerRouter);
+app.use('/api/user' , userRouter) ;
 
 // DB Connection
 let pool;

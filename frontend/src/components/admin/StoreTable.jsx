@@ -366,7 +366,12 @@ const StoreTable = ({ initialFilters = {}, hideOwnerColumn = false, apiUrl = nul
             {stores.map((store) => (
               <tr key={store.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{store.id}</td>
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{store.name}</td>
+                {/* <td className="px-4 py-3 text-sm font-medium text-gray-900">{store.name}</td> */}
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    <Link to={`/admin/store/${store.id}`} className="text-blue-600 hover:text-blue-800 hover:underline">
+                        {store.name}
+                    </Link>
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-500">{store.email || '-'}</td>
                 <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate" title={store.address}>{store.address}</td>
                 <td className="px-4 py-3 text-sm text-gray-500">
